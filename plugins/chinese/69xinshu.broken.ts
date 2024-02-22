@@ -23,6 +23,7 @@ class XinShu69 implements Plugin.PluginBase {
             url = `${this.site}/ajax_novels/class/${filters.class.value}/${pageNo}.htm`;
         }
 
+        
         const body = await fetchText(url, {}, 'gbk');
         if (body === '') throw Error('无法获取小说列表，请检查网络');
 
@@ -43,7 +44,7 @@ class XinShu69 implements Plugin.PluginBase {
                 const novel = {
                     name: novelName,
                     cover: novelCover,
-                    url: novelUrl,
+                    path: novelUrl,
                 };
 
                 novels.push(novel);
@@ -53,7 +54,7 @@ class XinShu69 implements Plugin.PluginBase {
         return novels;
     }
 
-    async parseNovelAndChapters(novelUrl: string): Promise<Plugin.SourceNovel> {
+    async parseNovel(novelUrl: string): Promise<Plugin.SourceNovel> {
         const url = novelUrl;
 
         const body = await fetchText(url, {}, 'gbk');
@@ -62,7 +63,8 @@ class XinShu69 implements Plugin.PluginBase {
         let loadedCheerio = parseHTML(body);
 
         const novel: Plugin.SourceNovel = {
-            url,
+            path: url,
+            name: '',
             chapters: [],
         };
 
@@ -107,7 +109,7 @@ class XinShu69 implements Plugin.PluginBase {
 
                     chapters.push({
                         name: chapterName,
-                        url: chapterUrl,
+                        path: chapterUrl,
                     });
                 }
             });
@@ -161,7 +163,7 @@ class XinShu69 implements Plugin.PluginBase {
 
             const novel = {
                 name: novelName,
-                url: novelUrl,
+                path: novelUrl,
                 cover: novelCover,
             };
 

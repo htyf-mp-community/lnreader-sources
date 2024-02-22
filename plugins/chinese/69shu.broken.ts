@@ -46,7 +46,7 @@ class Shu69 implements Plugin.PluginBase {
             const novel = {
                 name: novelName,
                 cover: novelCover,
-                url: novelUrl,
+                path: novelUrl,
             };
 
             novels.push(novel);
@@ -55,7 +55,7 @@ class Shu69 implements Plugin.PluginBase {
         return novels;
     }
 
-    async parseNovelAndChapters(novelUrl: string): Promise<Plugin.SourceNovel> {
+    async parseNovel(novelUrl: string): Promise<Plugin.SourceNovel> {
         const url = novelUrl;
 
         const body = await fetchText(url);
@@ -64,7 +64,8 @@ class Shu69 implements Plugin.PluginBase {
         let loadedCheerio = parseHTML(body);
 
         const novel: Plugin.SourceNovel = {
-            url,
+            path: url,
+            name: '',
             chapters: [],
         };
 
@@ -100,7 +101,7 @@ class Shu69 implements Plugin.PluginBase {
 
                 chapters.push({
                     name: chapterName,
-                    url: chapterUrl,
+                    path: chapterUrl,
                 });
             });
         } else {
@@ -110,7 +111,7 @@ class Shu69 implements Plugin.PluginBase {
 
                 chapters.push({
                     name: chapterName,
-                    url: chapterUrl,
+                    path: chapterUrl,
                 });
             });
         }
@@ -169,7 +170,7 @@ class Shu69 implements Plugin.PluginBase {
             const novel = {
                 name: novelName,
                 cover: novelCover,
-                url: novelUrl,
+                path: novelUrl,
             };
 
             novels.push(novel);

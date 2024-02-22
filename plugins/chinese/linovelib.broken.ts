@@ -42,7 +42,7 @@ class Linovelib implements Plugin.PluginBase {
             const novel = {
                 name: novelName,
                 cover: novelCover,
-                url: novelUrl,
+                path: novelUrl,
             };
 
             novels.push(novel);
@@ -51,7 +51,7 @@ class Linovelib implements Plugin.PluginBase {
         return novels;
     }
 
-    async parseNovelAndChapters(novelUrl: string): Promise<Plugin.SourceNovel> {
+    async parseNovel(novelUrl: string): Promise<Plugin.SourceNovel> {
         const url = novelUrl;
 
         const body = await fetchText(url);
@@ -60,7 +60,7 @@ class Linovelib implements Plugin.PluginBase {
         let loadedCheerio = parseHTML(body);
 
         const novel: Plugin.SourceNovel = {
-            url,
+            path: url,
             chapters: [],
         };
 
@@ -130,7 +130,7 @@ class Linovelib implements Plugin.PluginBase {
             chapter.push({
                 name: chapterName,
                 releaseTime: releaseDate,
-                url: chapterUrl,
+                path: chapterUrl,
             });
         });
 
