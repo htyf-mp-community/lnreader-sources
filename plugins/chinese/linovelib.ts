@@ -61,6 +61,7 @@ class Linovelib implements Plugin.PluginBase {
 
         const novel: Plugin.SourceNovel = {
             path: url,
+            name: '',
             chapters: [],
         };
 
@@ -522,7 +523,7 @@ class Linovelib implements Plugin.PluginBase {
 
             novels.push({
                 name: novelName,
-                url: novelUrl,
+                path: novelUrl,
                 cover: novelCover,
             });
         });
