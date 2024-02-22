@@ -24,7 +24,8 @@ const matched = REMOTE.match(/([^:/]+?)\/([^/.]+)(\.git)?$/);
 if (!matched) throw Error("Cant parse git url");
 const USERNAME = matched[1];
 const REPO = matched[2];
-const USER_CONTENT_LINK = `https://raw.githubusercontent.com/${USERNAME}/${REPO}/${CURRENT_BRANCH}`;
+// const USER_CONTENT_LINK = `https://raw.githubusercontent.com/${USERNAME}/${REPO}/${CURRENT_BRANCH}`;
+const USER_CONTENT_LINK = `https://raw.gitmirror.com/${USERNAME}/${REPO}/${CURRENT_BRANCH}`;
 
 const ICON_LINK = `${USER_CONTENT_LINK}/icons`;
 const PLUGIN_LINK = `${USER_CONTENT_LINK}/.js/plugins`;
