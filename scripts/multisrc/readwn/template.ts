@@ -4,6 +4,7 @@ import { Plugin } from "@typings/plugin";
 import { NovelStatus } from "@libs/novelStatus";
 import { load as parseHTML } from "cheerio";
 import dayjs from "dayjs";
+import qs from "qs";
 
 export interface ReadwnMetadata {
   id: string;
@@ -39,7 +40,8 @@ class ReadwnPlugin implements Plugin.PluginBase {
     url += showLatestNovels ? "lastdotime" : filters?.sort?.value || "newstime";
     url += "-" + (pageNo - 1) + ".html";
 
-    if (filters?.tags?.value) { //only 1 page
+    if (filters?.tags?.value) {
+      //only 1 page
       url = this.site + "/tags/" + filters.tags.value + "-0.html";
     }
 
@@ -48,25 +50,27 @@ class ReadwnPlugin implements Plugin.PluginBase {
 
     const novels: Plugin.NovelItem[] = loadedCheerio("li.novel-item")
       .map((index, element) => ({
-        name: loadedCheerio(element).find("h4").text(),
-        cover: this.site +
+        name: loadedCheerio(element).find("h4").text() || "",
+        cover:
+          this.site +
           loadedCheerio(element).find(".novel-cover > img").attr("data-src"),
-        url: this.site + loadedCheerio(element).find("a").attr("href"),
+        path: loadedCheerio(element).find("a").attr("href") || "",
       }))
-      .get();
+      .get()
+      .filter((novel) => novel.name && novel.path);
 
     return novels;
   }
 
-  async parseNovelAndChapters(novelUrl: string): Promise<Plugin.SourceNovel> {
-    const body = await fetchApi(novelUrl).then((res) => res.text());
-
+  async parseNovel(novelPath: string): Promise<Plugin.SourceNovel> {
+    const body = await fetchApi(this.site + novelPath).then((res) => res.text());
     const loadedCheerio = parseHTML(body);
+
     const novel: Plugin.SourceNovel = {
-      url: novelUrl,
+      path: novelPath,
+      name: loadedCheerio("h1.novel-title").text() || "",
     };
 
-    novel.name = loadedCheerio("h1.novel-title").text();
     novel.author = loadedCheerio("span[itemprop=author]").text();
     novel.cover =
       this.site + loadedCheerio("figure.cover > img").attr("data-src");
@@ -100,11 +104,17 @@ class ReadwnPlugin implements Plugin.PluginBase {
 
     const chapters: Plugin.ChapterItem[] = loadedCheerio(".chapter-list li")
       .map((chapterIndex, element) => {
-        const name = loadedCheerio(element).find("a .chapter-title").text().trim();
-        const url = loadedCheerio(element).find("a").attr("href")?.trim();
-        if (!name || !url) return null;
+        const name = loadedCheerio(element)
+          .find("a .chapter-title")
+          .text()
+          .trim();
+        const path = loadedCheerio(element).find("a").attr("href")?.trim();
+        if (!name || !path) return null;
 
-        let releaseTime = loadedCheerio(element).find("a .chapter-update").text().trim();
+        let releaseTime = loadedCheerio(element)
+          .find("a .chapter-update")
+          .text()
+          .trim();
         if (releaseTime?.includes?.("ago")) {
           const timeAgo = releaseTime.match(/\d+/)?.[0] || "0";
           const timeAgoInt = parseInt(timeAgo, 10);
@@ -112,14 +122,14 @@ class ReadwnPlugin implements Plugin.PluginBase {
           if (timeAgoInt) {
             const dayJSDate = dayjs(); // today
             if (
-              releaseTime.includes("hours ago") || 
+              releaseTime.includes("hours ago") ||
               releaseTime.includes("hour ago")
             ) {
               dayJSDate.subtract(timeAgoInt, "hours"); // go back N hours
             }
 
             if (
-              releaseTime.includes("days ago") || 
+              releaseTime.includes("days ago") ||
               releaseTime.includes("day ago")
             ) {
               dayJSDate.subtract(timeAgoInt, "days"); // go back N days
@@ -138,7 +148,7 @@ class ReadwnPlugin implements Plugin.PluginBase {
 
         return {
           name,
-          url: this.site + url,
+          path,
           releaseTime,
           chapterNumber: chapterIndex + 1,
         };
@@ -148,14 +158,14 @@ class ReadwnPlugin implements Plugin.PluginBase {
 
     if (latestChapterNo > chapters.length) {
       const lastChapterNo = parseInt(
-        chapters[chapters.length - 1].url.match(/_(\d+)\.html/)?.[1] || "",
+        chapters[chapters.length - 1].path.match(/_(\d+)\.html/)?.[1] || "",
         10,
       );
 
       for (let i = (lastChapterNo || chapters.length) + 1; i <= latestChapterNo; i++) {
         chapters.push({
           name: "Chapter " + i,
-          url: novelUrl.replace(".html", "_" + i + ".html"),
+          path: novelPath.replace(".html", "_" + i + ".html"),
           releaseTime: null,
           chapterNumber: i,
         });
@@ -166,8 +176,8 @@ class ReadwnPlugin implements Plugin.PluginBase {
     return novel;
   }
 
-  async parseChapter(chapterUrl: string): Promise<string> {
-    const body = await fetchApi(chapterUrl).then((res) => res.text());
+  async parseChapter(chapterPath: string): Promise<string> {
+    const body = await fetchApi(this.site + chapterPath).then((res) => res.text());
     const loadedCheerio = parseHTML(body);
 
     const chapterText = loadedCheerio(".chapter-content").html() || "";
@@ -182,20 +192,23 @@ class ReadwnPlugin implements Plugin.PluginBase {
         Origin: this.site,
       },
       method: "POST",
-      body:
-        "show=title&tempid=1&tbname=news&keyboard=" +
-        encodeURIComponent(searchTerm),
+      body: qs.stringify({
+        show: "title",
+        tempid: 1,
+        tbname: "news",
+        keyboard: searchTerm,
+      }),
     }).then((res) => res.text());
     const loadedCheerio = parseHTML(result);
 
     const novels: Plugin.NovelItem[] = loadedCheerio("li.novel-item")
       .map((index, element) => ({
-        name: loadedCheerio(element).find("h4").text(),
+        name: loadedCheerio(element).find("h4").text() || "",
         cover: this.site + loadedCheerio(element).find("img").attr("data-src"),
-        url: this.site + loadedCheerio(element).find("a").attr("href"),
+        path: loadedCheerio(element).find("a").attr("href") || "",
       }))
-      .get();
-
+      .get()
+      .filter((novel) => novel.name && novel.path);
     return novels;
   }
 
