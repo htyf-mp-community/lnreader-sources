@@ -1,6 +1,6 @@
 {
     "name": "lnreader-plugins",
-    "version": "1.0.0",
+    "version": "2.0.0",
     "description": "Plugins repo for LNReader",
     "main": "index.js",
     "scripts": {
@@ -11,7 +11,9 @@
         "clearMultisrc": "find . -type f -wholename \"*plugins*\\[*\\]*.[t,j]s\" -delete",
         "less": "npx less ./test_web/static/css/index.less ./test_web/static/css/index.css",
         "host-linux": "chmod +x ./host.sh && ./host.sh",
-        "host-windows": "powershell ./host.ps1"
+        "host-windows": "powershell ./host.ps1",
+        "prettier": "prettier --write \"./**/*.{js,ts}\"",
+        "prepare": "husky install"
     },
     "author": "LNReader",
     "license": "MIT",
@@ -24,6 +26,7 @@
         "express": "^4.18.2",
         "less": "^4.2.0",
         "module-alias": "^2.2.3",
+        "protobufjs": "^7.2.6",
         "qs": "^6.11.2",
         "sanitize-html": "^2.12.1",
         "terser": "^5.28.1",
@@ -43,7 +46,12 @@
         "@types/express": "^4.17.21",
         "@types/jquery": "^3.5.29",
         "@types/node": "^20.11.19",
-        "pre-commit": "^1.2.2",
+        "husky": "^9.0.11",
+        "lint-staged": "^15.2.2",
+        "prettier": "3.2.5",
         "tsc-watch": "^6.0.4"
+    },
+    "lint-staged": {
+        "**/*.{js,ts}": "prettier --write"
     }
 }
