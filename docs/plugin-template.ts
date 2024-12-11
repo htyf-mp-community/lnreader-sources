@@ -1,11 +1,14 @@
-import { fetchFile } from '@libs/fetch';
+import { fetchApi, fetchProto, fetchText } from '@libs/fetch';
 import { Plugin } from '@typings/plugin';
 import { Filters } from '@libs/filterInputs';
 import { load as loadCheerio } from 'cheerio';
 import { defaultCover } from '@libs/defaultCover';
 import { NovelStatus } from '@libs/novelStatus';
-// import { isUrlAbsolute } from "@libs/isAbsoluteUrl";
-// import { parseMadaraDate } from "@libs/parseMadaraDate";
+// import { isUrlAbsolute } from '@libs/isAbsoluteUrl';
+// import { storage, localStorage, sessionStorage } from '@libs/storage';
+// import { encode, decode } from 'urlencode';
+// import dayjs from 'dayjs';
+// import { Parser } from 'htmlparser2';
 
 class TemplatePlugin implements Plugin.PluginBase {
   id = '';
@@ -14,6 +17,10 @@ class TemplatePlugin implements Plugin.PluginBase {
   site = 'https://example.com';
   version = '1.0.0';
   filters: Filters | undefined = undefined;
+  imageRequestInit?: Plugin.ImageRequestInit | undefined = undefined;
+
+  //flag indicates whether access to LocalStorage, SesesionStorage is required.
+  webStorageUtilized?: boolean;
 
   async popularNovels(
     pageNo: number,
@@ -41,15 +48,15 @@ class TemplatePlugin implements Plugin.PluginBase {
     // TODO: get here data from the site and
     // un-comment and fill-in the relevant fields
 
-    // novel.name = "";
-    // novel.artist = "";
-    // novel.author = "";
+    // novel.name = '';
+    // novel.artist = '';
+    // novel.author = '';
     novel.cover = defaultCover;
-    // novel.genres = "";
+    // novel.genres = '';
     // novel.status = NovelStatus.Completed;
-    // novel.summary = "";
+    // novel.summary = '';
 
-    let chapters: Plugin.ChapterItem[] = [];
+    const chapters: Plugin.ChapterItem[] = [];
 
     // TODO: here parse the chapter list
 
@@ -74,17 +81,15 @@ class TemplatePlugin implements Plugin.PluginBase {
     searchTerm: string,
     pageNo: number,
   ): Promise<Plugin.NovelItem[]> {
-    let novels: Plugin.NovelItem[] = [];
+    const novels: Plugin.NovelItem[] = [];
 
     // get novels using the search term
 
     return novels;
   }
-  async fetchImage(url: string): Promise<string | undefined> {
-    // if your plugin has images and they won't load
-    // this is the function to fiddle with
-    return fetchFile(url);
-  }
+
+  resolveUrl = (path: string, isNovel?: boolean) =>
+    this.site + (isNovel ? '/book/' : '/chapter/') + path;
 }
 
 export default new TemplatePlugin();

@@ -1,16 +1,16 @@
-import { fetchFile, fetchApi } from '@libs/fetch';
+import { fetchApi } from '@libs/fetch';
 import { Filters, FilterTypes } from '@libs/filterInputs';
 import { Plugin } from '@typings/plugin';
 import { NovelStatus } from '@libs/novelStatus';
 import { load as parseHTML } from 'cheerio';
 import dayjs from 'dayjs';
 
-export interface RulateMetadata {
+export type RulateMetadata = {
   id: string;
   sourceSite: string;
   sourceName: string;
   filters?: Filters;
-}
+};
 
 class RulatePlugin implements Plugin.PluginBase {
   id: string;
@@ -192,13 +192,6 @@ class RulatePlugin implements Plugin.PluginBase {
     const body = await result.text();
     const loadedCheerio = parseHTML(body);
 
-    loadedCheerio('.content-text img').each((index, element) => {
-      if (!loadedCheerio(element).attr('src')?.startsWith('http')) {
-        const src = loadedCheerio(element).attr('src');
-        loadedCheerio(element).attr('src', this.site + src);
-      }
-    });
-
     const chapterText = loadedCheerio('.content-text').html();
     return chapterText || '';
   }
@@ -224,7 +217,7 @@ class RulatePlugin implements Plugin.PluginBase {
   }
 
   parseDate = (dateString: string | undefined = '') => {
-    const months: { [key: string]: number } = {
+    const months: Record<string, number> = {
       'янв.': 1,
       'февр.': 2,
       'мар.': 3,
@@ -246,14 +239,12 @@ class RulatePlugin implements Plugin.PluginBase {
     }
     return dateString || null;
   };
-
-  fetchImage = fetchFile;
 }
 
-interface response {
+type response = {
   id: number;
   title_one: string;
   title_two: string;
   url: string;
   img: string;
-}
+};

@@ -1,7 +1,7 @@
-import { fetchApi, fetchFile } from '@libs/fetch';
-import { Filters, FilterTypes } from '@libs/filterInputs';
+import { fetchApi } from '@libs/fetch';
+import { Filters } from '@libs/filterInputs';
 import { Plugin } from '@typings/plugin';
-import { CheerioAPI, load as parseHTML } from 'cheerio';
+import { Cheerio, AnyNode, CheerioAPI, load as parseHTML } from 'cheerio';
 import { defaultCover } from '@libs/defaultCover';
 import { NovelStatus } from '@libs/novelStatus';
 import dayjs from 'dayjs';
@@ -9,20 +9,20 @@ import dayjs from 'dayjs';
 const includesAny = (str: string, keywords: string[]) =>
   new RegExp(keywords.join('|')).test(str);
 
-interface MadaraOptions {
+type MadaraOptions = {
   useNewChapterEndpoint?: boolean;
   lang?: string;
   orderBy?: string;
   versionIncrements?: number;
-}
+};
 
-export interface MadaraMetadata {
+export type MadaraMetadata = {
   id: string;
   sourceSite: string;
   sourceName: string;
   options?: MadaraOptions;
   filters?: any;
-}
+};
 
 class MadaraPlugin implements Plugin.PluginBase {
   id: string;
@@ -39,18 +39,57 @@ class MadaraPlugin implements Plugin.PluginBase {
     this.icon = `multisrc/madara/${metadata.id.toLowerCase()}/icon.png`;
     this.site = metadata.sourceSite;
     const versionIncrements = metadata.options?.versionIncrements || 0;
-    this.version = `1.0.${1 + versionIncrements}`;
+    this.version = `1.0.${5 + versionIncrements}`;
     this.options = metadata.options;
     this.filters = metadata.filters;
   }
 
-  getHostname(url: string): string {
-    return url.split('/')[2];
+  translateDragontea(text: Cheerio<AnyNode>): Cheerio<AnyNode> {
+    if (this.id === 'dragontea') {
+      const $ = parseHTML(text.html() || '');
+      let sanitizedText = $.html() || '';
+      sanitizedText = sanitizedText.replace('\n', '');
+      sanitizedText = sanitizedText.replace(/<br\s*\/?>/g, '\n');
+      text.html(sanitizedText);
+      text.find(':not(:has(*))').each((i, el) => {
+        // Select only the deepest elements to avoid reversing the text twice
+        const $el = $(el);
+        const alphabet =
+          'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+        const reversedAlphabet =
+          'zyxwvutsrqponmlkjihgfedcbaZYXWVUTSRQPONMLKJIHGFEDCBA'.split('');
+        const text = $el.text().normalize('NFD'); // Normalize the string to separate the accents
+        const reversedText = text.split('');
+        const reversedLetters = [...reversedText]
+          .map(letter => {
+            const baseLetter = letter.normalize('NFC');
+            const index = alphabet.indexOf(baseLetter);
+            return index !== -1
+              ? reversedAlphabet[index] + letter.slice(baseLetter.length)
+              : letter;
+          })
+          .join('');
+        $el.html(
+          $el
+            .html()
+            ?.replace($el.text(), reversedLetters)
+            .replace('\n', '<br>') || '',
+        );
+      });
+    }
+    return text;
   }
 
-  async getCheerio(url: string): Promise<CheerioAPI> {
+  getHostname(url: string): string {
+    url = url.split('/')[2];
+    const url_parts = url.split('.');
+    url_parts.pop(); // remove TLD
+    return url_parts.join('.');
+  }
+
+  async getCheerio(url: string, search: boolean): Promise<CheerioAPI> {
     const r = await fetchApi(url);
-    if (!r.ok)
+    if (!r.ok && search != true)
       throw new Error(
         'Could not reach site (' + r.status + ') try to open in webview.',
       );
@@ -87,11 +126,12 @@ class MadaraPlugin implements Plugin.PluginBase {
         const novelCover =
           image.attr('data-src') ||
           image.attr('src') ||
-          image.attr('data-lazy-srcset');
+          image.attr('data-lazy-srcset') ||
+          defaultCover;
         const novel: Plugin.NovelItem = {
           name: novelName,
           cover: novelCover,
-          path: novelUrl.replace(this.site, ''),
+          path: novelUrl.replace(/https?:\/\/.*?\//, '/'),
         };
         novels.push(novel);
       },
@@ -108,7 +148,7 @@ class MadaraPlugin implements Plugin.PluginBase {
     }: Plugin.PopularNovelsOptions<typeof this.filters>,
   ): Promise<Plugin.NovelItem[]> {
     let url = this.site + '/page/' + pageNo + '/?s=&post_type=wp-manga';
-    if (!filters) filters = {};
+    if (!filters) filters = this.filters || {};
     if (showLatestNovels) url += '&m_orderby=latest';
     for (const key in filters) {
       if (typeof filters[key].value === 'object')
@@ -116,20 +156,19 @@ class MadaraPlugin implements Plugin.PluginBase {
           url += `&${key}=${value}`;
       else if (filters[key].value) url += `&${key}=${filters[key].value}`;
     }
-    const loadedCheerio = await this.getCheerio(url);
+    const loadedCheerio = await this.getCheerio(url, pageNo != 1);
     return this.parseNovels(loadedCheerio);
   }
 
   async parseNovel(novelPath: string): Promise<Plugin.SourceNovel> {
-    const body = await fetchApi(this.site + novelPath).then(res => res.text());
-    let loadedCheerio = parseHTML(body);
+    let loadedCheerio = await this.getCheerio(this.site + novelPath, false);
 
     loadedCheerio('.manga-title-badges, #manga-title span').remove();
     const novel: Plugin.SourceNovel = {
       path: novelPath,
       name:
         loadedCheerio('.post-title h1').text().trim() ||
-        loadedCheerio('#manga-title h1').text(),
+        loadedCheerio('#manga-title h1').text().trim(),
     };
 
     novel.cover =
@@ -140,37 +179,78 @@ class MadaraPlugin implements Plugin.PluginBase {
 
     loadedCheerio('.post-content_item, .post-content').each(function () {
       const detailName = loadedCheerio(this).find('h5').text().trim();
-      const detail = loadedCheerio(this).find('.summary-content').text().trim();
+      const detail = loadedCheerio(this).find('.summary-content');
 
       switch (detailName) {
         case 'Genre(s)':
+        case 'Genre':
+        case 'Tags(s)':
+        case 'Tag(s)':
+        case 'Tags':
         case 'Género(s)':
         case 'التصنيفات':
-          novel.genres = detail;
+          if (novel.genres)
+            novel.genres +=
+              ', ' +
+              detail
+                .find('a')
+                .map((i, el) => loadedCheerio(el).text())
+                .get()
+                .join(', ');
+          else
+            novel.genres = detail
+              .find('a')
+              .map((i, el) => loadedCheerio(el).text())
+              .get()
+              .join(', ');
           break;
         case 'Author(s)':
+        case 'Author':
         case 'Autor(es)':
         case 'المؤلف':
         case 'المؤلف (ين)':
-          novel.author = detail;
+          novel.author = detail.text().trim();
           break;
         case 'Status':
+        case 'Novel':
         case 'Estado':
           novel.status =
-            detail.includes('OnGoing') || detail.includes('مستمرة')
+            detail.text().trim().includes('OnGoing') ||
+            detail.text().trim().includes('مستمرة')
               ? NovelStatus.Ongoing
               : NovelStatus.Completed;
+          break;
+        case 'Artist(s)':
+          novel.artist = detail.text().trim();
           break;
       }
     });
 
-    loadedCheerio('div.summary__content .code-block,script').remove();
+    if (!novel.author)
+      novel.author = loadedCheerio('.manga-authors').text().trim();
+
+    loadedCheerio('div.summary__content .code-block,script,noscript').remove();
     novel.summary =
-      loadedCheerio('div.summary__content').text().trim() ||
+      this.translateDragontea(loadedCheerio('div.summary__content'))
+        .text()
+        .trim() ||
       loadedCheerio('#tab-manga-about').text().trim() ||
       loadedCheerio('.post-content_item h5:contains("Summary")')
         .next()
-        .text()
+        .find('span')
+        .map((i, el) => loadedCheerio(el).text())
+        .get()
+        .join('\n\n')
+        .trim() ||
+      loadedCheerio('.manga-summary p')
+        .map((i, el) => loadedCheerio(el).text())
+        .get()
+        .join('\n\n')
+        .trim() ||
+      loadedCheerio('.manga-excerpt p')
+        .map((i, el) => loadedCheerio(el).text())
+        .get()
+        .join('\n\n')
         .trim();
     const chapters: Plugin.ChapterItem[] = [];
     let html = '';
@@ -214,14 +294,16 @@ class MadaraPlugin implements Plugin.PluginBase {
         releaseDate = dayjs().format('LL');
       }
 
-      let chapterUrl = loadedCheerio(element).find('a').attr('href') || '';
+      const chapterUrl = loadedCheerio(element).find('a').attr('href') || '';
 
-      chapters.push({
-        name: chapterName,
-        path: chapterUrl.replace(this.site, ''),
-        releaseTime: releaseDate || null,
-        chapterNumber: totalChapters - chapterIndex,
-      });
+      if (chapterUrl && chapterUrl != '#') {
+        chapters.push({
+          name: chapterName,
+          path: chapterUrl.replace(/https?:\/\/.*?\//, '/'),
+          releaseTime: releaseDate || null,
+          chapterNumber: totalChapters - chapterIndex,
+        });
+      }
     });
 
     novel.chapters = chapters.reverse();
@@ -229,19 +311,18 @@ class MadaraPlugin implements Plugin.PluginBase {
   }
 
   async parseChapter(chapterPath: string): Promise<string> {
-    const body = await fetchApi(this.site + chapterPath).then(res =>
-      res.text(),
-    );
-
-    const loadedCheerio = parseHTML(body);
+    const loadedCheerio = await this.getCheerio(this.site + chapterPath, false);
     const chapterText =
-      loadedCheerio('.text-left').html() ||
-      loadedCheerio('.text-right').html() ||
-      loadedCheerio('.entry-content').html() ||
-      loadedCheerio('.c-blog-post > div > div:nth-child(2)').html() ||
-      '';
+      loadedCheerio('.text-left') ||
+      loadedCheerio('.text-right') ||
+      loadedCheerio('.entry-content') ||
+      loadedCheerio('.c-blog-post > div > div:nth-child(2)');
 
-    return chapterText;
+    if (this.id === 'riwyat') {
+      chapterText.find('span[style*="opacity: 0; position: fixed;"]').remove();
+    }
+    chapterText.find('div.text-right').attr('style', 'text-align: right;');
+    return this.translateDragontea(chapterText).html() || '';
   }
 
   async searchNovels(
@@ -250,26 +331,24 @@ class MadaraPlugin implements Plugin.PluginBase {
   ): Promise<Plugin.NovelItem[]> {
     const url =
       this.site +
-      'page/' +
+      '/page/' +
       pageNo +
       '/?s=' +
       searchTerm +
       '&post_type=wp-manga';
-    const loadedCheerio = await this.getCheerio(url);
+    const loadedCheerio = await this.getCheerio(url, true);
     return this.parseNovels(loadedCheerio);
   }
 
-  fetchImage = fetchFile;
-
   parseData = (date: string) => {
-    const dayJSDate = dayjs(); // today
+    let dayJSDate = dayjs(); // today
     const timeAgo = date.match(/\d+/)?.[0] || '';
     const timeAgoInt = parseInt(timeAgo, 10);
 
     if (!timeAgo) return date; // there is no number!
 
     if (includesAny(date, ['detik', 'segundo', 'second', 'วินาที'])) {
-      dayJSDate.subtract(timeAgoInt, 'second'); // go back N seconds
+      dayJSDate = dayJSDate.subtract(timeAgoInt, 'second'); // go back N seconds
     } else if (
       includesAny(date, [
         'menit',
@@ -281,7 +360,7 @@ class MadaraPlugin implements Plugin.PluginBase {
         'دقائق',
       ])
     ) {
-      dayJSDate.subtract(timeAgoInt, 'minute'); // go back N minute
+      dayJSDate = dayJSDate.subtract(timeAgoInt, 'minute'); // go back N minute
     } else if (
       includesAny(date, [
         'jam',
@@ -296,7 +375,7 @@ class MadaraPlugin implements Plugin.PluginBase {
         '小时',
       ])
     ) {
-      dayJSDate.subtract(timeAgoInt, 'hours'); // go back N hours
+      dayJSDate = dayJSDate.subtract(timeAgoInt, 'hours'); // go back N hours
     } else if (
       includesAny(date, [
         'hari',
@@ -312,14 +391,17 @@ class MadaraPlugin implements Plugin.PluginBase {
         '天',
       ])
     ) {
-      dayJSDate.subtract(timeAgoInt, 'days'); // go back N days
+      dayJSDate = dayJSDate.subtract(timeAgoInt, 'days'); // go back N days
     } else if (includesAny(date, ['week', 'semana'])) {
-      dayJSDate.subtract(timeAgoInt, 'week'); // go back N a week
+      dayJSDate = dayJSDate.subtract(timeAgoInt, 'week'); // go back N a week
     } else if (includesAny(date, ['month', 'mes'])) {
-      dayJSDate.subtract(timeAgoInt, 'month'); // go back N months
+      dayJSDate = dayJSDate.subtract(timeAgoInt, 'month'); // go back N months
     } else if (includesAny(date, ['year', 'año'])) {
-      dayJSDate.subtract(timeAgoInt, 'year'); // go back N years
+      dayJSDate = dayJSDate.subtract(timeAgoInt, 'year'); // go back N years
     } else {
+      if (dayjs(date).format('LL') !== 'Invalid Date') {
+        return dayjs(date).format('LL');
+      }
       return date;
     }
 

@@ -1,22 +1,21 @@
-import { fetchFile, fetchApi } from '@libs/fetch';
-import { Filters, FilterTypes } from '@libs/filterInputs';
+import { fetchApi } from '@libs/fetch';
+import { Filters } from '@libs/filterInputs';
 import { Plugin } from '@typings/plugin';
 import { NovelStatus } from '@libs/novelStatus';
 import { load as parseHTML } from 'cheerio';
 import dayjs from 'dayjs';
-import qs from 'qs';
 
-interface ReadwnOptions {
+type ReadwnOptions = {
   versionIncrements?: number;
-}
+};
 
-export interface ReadwnMetadata {
+export type ReadwnMetadata = {
   id: string;
   sourceSite: string;
   sourceName: string;
   filters?: any;
   options?: ReadwnOptions;
-}
+};
 
 class ReadwnPlugin implements Plugin.PluginBase {
   id: string;
@@ -32,7 +31,7 @@ class ReadwnPlugin implements Plugin.PluginBase {
     this.icon = `multisrc/readwn/${metadata.id.toLowerCase()}/icon.png`;
     this.site = metadata.sourceSite;
     const versionIncrements = metadata.options?.versionIncrements || 0;
-    this.version = `1.0.${1 + versionIncrements}`;
+    this.version = `1.0.${2 + versionIncrements}`;
     this.filters = metadata.filters;
   }
 
@@ -204,12 +203,12 @@ class ReadwnPlugin implements Plugin.PluginBase {
         Origin: this.site,
       },
       method: 'POST',
-      body: qs.stringify({
+      body: new URLSearchParams({
         show: 'title',
         tempid: 1,
         tbname: 'news',
         keyboard: searchTerm,
-      }),
+      }).toString(),
     }).then(res => res.text());
     const loadedCheerio = parseHTML(result);
 
@@ -223,6 +222,4 @@ class ReadwnPlugin implements Plugin.PluginBase {
       .filter(novel => novel.name && novel.path);
     return novels;
   }
-
-  fetchImage = fetchFile;
 }

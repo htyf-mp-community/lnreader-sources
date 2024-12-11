@@ -1,16 +1,16 @@
-import { fetchFile, fetchApi } from '@libs/fetch';
+import { fetchApi } from '@libs/fetch';
 import { Filters, FilterTypes } from '@libs/filterInputs';
 import { Plugin } from '@typings/plugin';
 import { NovelStatus } from '@libs/novelStatus';
 import { load as parseHTML } from 'cheerio';
 import dayjs from 'dayjs';
 
-export interface IfreedomMetadata {
+export type IfreedomMetadata = {
   id: string;
   sourceSite: string;
   sourceName: string;
   filters?: Filters;
-}
+};
 
 class IfreedomPlugin implements Plugin.PluginBase {
   id: string;
@@ -140,7 +140,7 @@ class IfreedomPlugin implements Plugin.PluginBase {
       res.text(),
     );
     let chapterText =
-      body.match(/<article id="([\s\S]*?)<\/article>/g)?.[0] || '';
+      body.match(/<article id="([\s\S]*?)<\/article>/)?.[0] || '';
     chapterText = chapterText.replace(/<script[^>]*>[\s\S]*?<\/script>/gim, '');
 
     if (chapterText.includes('<img')) {
@@ -152,8 +152,7 @@ class IfreedomPlugin implements Plugin.PluginBase {
           .pop();
 
         if (bestlink) {
-          if (bestlink.startsWith('http')) return `src="${bestlink}"`;
-          return `src="${this.site}${bestlink}"`;
+          return `src="${bestlink}"`;
         }
         return match;
       });
@@ -187,7 +186,7 @@ class IfreedomPlugin implements Plugin.PluginBase {
   }
 
   parseDate = (dateString: string | undefined = '') => {
-    const months: { [key: string]: number } = {
+    const months: Record<string, number> = {
       января: 1,
       февраля: 2,
       марта: 3,
@@ -216,6 +215,4 @@ class IfreedomPlugin implements Plugin.PluginBase {
     }
     return dateString || null;
   };
-
-  fetchImage = fetchFile;
 }

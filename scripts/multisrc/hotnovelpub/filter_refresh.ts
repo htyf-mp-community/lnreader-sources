@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as cheerio from 'cheerio';
 import * as path from 'path';
-import list from './sources.json';
+import list from './sources.json' with { type: 'json' };
 import { HotNovelPubMetadata } from './template';
 
 async function getFilters(sources: HotNovelPubMetadata) {
@@ -55,16 +55,16 @@ async function getFilters(sources: HotNovelPubMetadata) {
   return filters;
 }
 
-interface response {
+type response = {
   status: number;
   message: string;
   data?: DataEntity[];
-}
-interface DataEntity {
+};
+type DataEntity = {
   id: number;
   name: string;
   slug: string;
-}
+};
 
 async function start() {
   const result = [];
