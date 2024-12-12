@@ -9,8 +9,8 @@ class XinShu69 implements Plugin.PluginBase {
   id = '69xinshu';
   name = '69书吧';
   icon = 'src/cn/69xinshu/icon.png';
-  site = 'https://69shu.biz';
-  version = '0.1.2';
+  site = 'https://69shuba.cx';
+  version = '0.1.3';
 
   async popularNovels(
     pageNo: number,
